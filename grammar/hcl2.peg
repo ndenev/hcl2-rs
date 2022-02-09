@@ -1,0 +1,123 @@
+ConfigFile <- Body EOI;
+
+Body <- ( Attribute / Block / OneLineBlock / Comment / WHITESPACE NEWLINE? )*;
+
+Attribute <- Identifier WHITESPACE "=" WHITESPACE Expression WHITESPACE NEWLINE?;
+
+Identifier <- XID_IDENTIFIER;
+
+Expression <- ( ExprTerm / Operation / Conditional );
+
+OneLineBlock <- Identifier ( StringLit / Identifier )* "{" (Identifier "=" Expression)? "}" NEWLINE+;
+
+Block <- Identifier WHITESPACE ( StringLit / Identifier )* WHITESPACE "{" WHITESPACE Body WHITESPACE "}" WHITESPACE NEWLINE+;
+
+Comment <- ("/*" ANY "*/") / ( "#" / "//" ) ANY NEWLINE;
+
+NEWLINE <- '\n';
+
+ANY <- re#.*#;
+
+TemplateFor <- (
+    ("%{" / "%{~") "for" Identifier ("," Identifier) "in" Expression ("}" / "~}")
+    Template
+    ("%{" / "%{~") "endfor" ("}" / "~}")
+);
+
+TemplateIf <- (
+    ("%{" / "%{~") "if" Expression ("}" / "~}")
+    Template
+    (
+        ("%{" / "%{~") "else" ("}" / "~}")
+        Template
+    )?
+    ("%{" / "%{~") "endif" ("}" / "~}")
+);
+
+TemplateInterpolation <- ( "${" / "${~" ) Expression ( "}" / "~}" );
+
+TemplateLiteral <- StringLit;
+
+Template <- (
+    TemplateLiteral /
+    TemplateInterpolation /
+    TemplateDirective
+)*;
+
+TemplateDirective <- TemplateIf / TemplateFor;
+
+Conditional <- Expression "?" Expression ":" Expression;
+
+Operation <- unaryOp / binaryOp;
+unaryOp <- ("-" / "!") ExprTerm;
+binaryOp <- ExprTerm binaryOperator ExprTerm;
+binaryOperator <- compareOperator / arithmeticOperator / logicOperator;
+compareOperator <- "==" / "!=" / "<" / ">" / "<=" / ">=";
+arithmeticOperator <- "+" / "-" / "*" / "/" / "%";
+logicOperator <- "&&" / "||" / "!";
+
+
+Splat <- attrSplat / fullSplat;
+attrSplat <- "." "*" GetAttr*;
+fullSplat <- "[" "*" "]" (GetAttr / Index)*;
+
+GetAttr <- "." Identifier;
+
+LegacyIndex <- '.' re#[0-9]+#;
+
+Index <- ( "[" Expression "]" ) / LegacyIndex;
+
+ForExpr <- forTupleExpr / forObjectExpr;
+forTupleExpr <- "[" forIntro Expression forCond? "]";
+forObjectExpr <- "{" forIntro Expression "=>" Expression "..."? forCond? "}";
+forIntro <- "for" Identifier ("," Identifier)? "in" Expression ":";
+forCond <- "if" Expression;
+
+FunctionCall <- Identifier "(" Arguments ")";
+
+Arguments <- (
+    "(" ")" /
+    (Expression ("," Expression)* ("," / "...")?)
+);
+
+VariableExpr <- Identifier;
+
+StringLit <- '"' re#([a-zA-Z0-9]|\\(n|r|t|"|\\|u[0-9]{4}|U[0-9]{8}"))# '"';
+
+TemplateExpr <- quotedTemplate / heredocTemplate;
+quotedTemplate <- StringLit;
+heredocTemplate <- (
+    ("<<" / "<<-") Identifier NEWLINE
+    StringLit*
+    Identifier NEWLINE
+);
+
+CollectionValue <- tuple / object;
+
+tuple <- "[" ( (Expression ("," Expression)* ","?)? ) "]";
+object <- "{" ( (objectelem ("," objectelem)* ","?)? ) "}";
+
+objectelem <- (Identifier / Expression) ("=" / ":") Expression;
+
+NumericLit <- decimal+ ("." decimal+)? (expmark decimal+)?;
+decimal    <- re#[0-9]#;
+expmark    <- ('e' / 'E') ("+" / "-")?;
+
+LiteralValue <- (
+  NumericLit /
+  "true" /
+  "false" /
+  "null"
+);
+
+ExprTerm <- ( LiteralValue /
+    CollectionValue /
+    TemplateExpr /
+    VariableExpr /
+    FunctionCall /
+    ForExpr /
+    ExprTerm Index /
+    ExprTerm GetAttr /
+    ExprTerm Splat /
+    "(" Expression ")"
+);

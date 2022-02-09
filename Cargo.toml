@@ -1,0 +1,13 @@
+[package]
+name = "hcl2-rs"
+version = "0.1.0"
+authors = ["Nikolay Denev <ndenev@gmail.com>"]
+edition = "2021"
+
+[build-dependencies]
+lrpeg = "0.4.1"
+
+[dependencies]
+lrpeg = "0.4.1"
+regex = "1.5.4"
+unicode-xid = "0.2.2"
